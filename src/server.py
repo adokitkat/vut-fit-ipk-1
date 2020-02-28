@@ -72,6 +72,27 @@ class Handler (http.server.BaseHTTPRequestHandler):
     self.response(200)
     self.wfile.write(output.rstrip().encode('utf-8'))
 
+  def do_HEAD(self):
+    self.response(405)
+
+  def do_PUT(self):
+    self.response(405)
+
+  def do_DELETE(self):
+    self.response(405)
+  
+  def do_CONNECT(self):
+    self.response(405)
+
+  def do_OPTIONS(self):
+    self.response(405)
+
+  def do_TRACE(self):
+    self.response(405)
+
+  def do_PATCH(self):
+    self.response(405)
+
 if __name__ == "__main__":
 
   if len(sys.argv) > 1 and sys.argv[1].isdigit() and int(sys.argv[1]) >= 0 and int(sys.argv[1]) <= 65535:
