@@ -1,4 +1,4 @@
-import http.server, socket, socketserver, sys, re
+import http.server, socket, socketserver, sys, re, cgi
 
 class Handler (http.server.BaseHTTPRequestHandler):
 
@@ -7,50 +7,70 @@ class Handler (http.server.BaseHTTPRequestHandler):
     self.send_header("Content-type", "text/html")
     self.end_headers()
 
-  def do_GET(self):
+  def validate(self, line, method):
+    if method == 'GET':
+      re_name = r"(?<=name=)(.*?)(?=&|$)"
+      re_type = r"(?<=type=)(A|PTR)(?=&|$)"
+    elif method == 'POST':
+      re_name = r"^(.*?)(?=:)"
+      re_type = r"(?<=:)(A|PTR)$"
 
-    if re.search(r"^/resolve", self.path) == None:
+    name_or_ip = re.search(re_name, line)
+    response_type = re.search(re_type, line)
+    if name_or_ip == None or response_type == None:
       self.response(400)
-      return
-
-    re_name = r"(?<=name=)(.*?)(?=&|$)"
-    name_or_ip = re.search(re_name, self.path)
-    if name_or_ip == None:
-      self.response(400)
-      return
-
-    re_type = r"(?<=type=)(A|PTR)(?=&|$)"
-    response_type = re.search(re_type, self.path)
-    if response_type == None:
-      self.response(400)
-      return
+      return None
     
-    elif response_type.group(1) == 'A':
+    if response_type.group(1) == 'A':
       try:
         resolved_name_or_ip = socket.gethostbyname(name_or_ip.group(1))
       except:
         self.response(404)
-        return
+        return None
     
     elif response_type.group(1) == 'PTR':
       try:
         resolved_name_or_ip = socket.gethostbyaddr(name_or_ip.group(1))[0]
       except:
         self.response(404)
-        return
+        return None
 
-    self.response(200)
-    self.wfile.write((name_or_ip.group(1) + ':' + response_type.group(1)+ '=' + resolved_name_or_ip).encode('utf-8'))
+    return name_or_ip.group(1), response_type.group(1), resolved_name_or_ip
 
-  def do_POST(self):
+  def do_GET(self):
 
-    if re.search(r"^/dns-query", self.path) == None:
+    if re.search(r"^/resolve", self.path) == None:
       self.response(400)
       return
 
-    self.send_response(200)
-    self.send_header("Content-type", "text/html")
-    self.end_headers()
+    result = self.validate(self.path, 'GET')
+    if result == None:
+      return
+    else:
+      name_or_ip, response_type, resolved_name_or_ip = result
+
+    self.response(200)
+    self.wfile.write((name_or_ip + ':' + response_type + '=' + resolved_name_or_ip).encode('utf-8'))
+
+  def do_POST(self):
+
+    if self.path != "/dns-query":
+      self.response(400)
+      return
+
+    content_length = int(self.headers['Content-Length'])
+    post_data = self.rfile.read(content_length)
+    output = ''
+    for line in iter(post_data.decode('utf-8').splitlines()):
+      result = self.validate(line, 'POST')
+      if result == None:
+        return
+      else:
+        name_or_ip, response_type, resolved_name_or_ip = result
+        output += (name_or_ip + ':' + response_type + '=' + resolved_name_or_ip + '\n')
+
+    self.response(200)
+    self.wfile.write(output.rstrip().encode('utf-8'))
 
 if __name__ == "__main__":
 
@@ -63,6 +83,7 @@ if __name__ == "__main__":
       print("serving at port", PORT)
       try:
         httpd.serve_forever()
-      except:
+      except Exception:
         pass
-      httpd.server_close()
+      finally:
+        httpd.server_close()
