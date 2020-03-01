@@ -9,33 +9,42 @@ class Handler (http.server.BaseHTTPRequestHandler):
 
   def validate(self, line, method):
     if method == 'GET':
-      re_name = r"(?<=name=)(.*?)(?=&|$)"
       re_type = r"(?<=type=)(A|PTR)(?=&|$)"
     elif method == 'POST':
-      re_name = r"^(.*?)(?=:)"
       re_type = r"(?<=:)(A|PTR)$"
 
-    name_or_ip = re.search(re_name, line)
     response_type = re.search(re_type, line)
-    if name_or_ip == None or response_type == None:
+    if response_type == None:
       self.response(400)
       return None
     
-    if response_type.group(1) == 'A':
-      try:
-        resolved_name_or_ip = socket.gethostbyname(name_or_ip.group(1))
-      except:
-        self.response(404)
-        return None
-    
-    elif response_type.group(1) == 'PTR':
-      try:
-        resolved_name_or_ip = socket.gethostbyaddr(name_or_ip.group(1))[0]
-      except:
-        self.response(404)
-        return None
+    if response_type.group(0) == 'A':
+      if method == 'GET':
+        re_name = r"(?<=name=)(.*?)(?=&|$)"
+      elif method == 'POST':
+        re_name = r"^(.*?)(?=:)"
+        
+    elif response_type.group(0) == 'PTR':
+      if method == 'GET':
+        re_name = r"(?<=name=)(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?=&|$)"
+      elif method == 'POST':
+        re_name = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?=:)"
+        
+    name_or_ip = re.search(re_name, line) 
+    if name_or_ip == None:
+      self.response(400)
+      return None
 
-    return name_or_ip.group(1), response_type.group(1), resolved_name_or_ip
+    try:
+      if response_type.group(0) == 'A':
+        resolved_name_or_ip = socket.gethostbyname(name_or_ip.group(0))
+      elif response_type.group(0) == 'PTR':
+        resolved_name_or_ip = socket.gethostbyaddr(name_or_ip.group(0))[0]
+    except:
+      self.response(404)
+      return None
+
+    return name_or_ip.group(0), response_type.group(0), resolved_name_or_ip
 
   def do_GET(self):
 
@@ -101,7 +110,6 @@ if __name__ == "__main__":
     PORT = 5353
 
   with socketserver.TCPServer(("", PORT), Handler) as httpd:
-      print("serving at port", PORT)
       try:
         httpd.serve_forever()
       except Exception:
