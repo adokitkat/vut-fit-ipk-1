@@ -2,8 +2,9 @@ import http.server, socket, socketserver, sys, re, cgi
 
 class Handler (http.server.BaseHTTPRequestHandler):
 
-  def response(self, n):
-    self.send_response(n)
+  def response(self, n, msg=None):
+    self.protocol_version = 'HTTP/1.1'
+    self.send_response(n, msg)
     self.send_header("Content-type", "text/html")
     self.end_headers()
 
@@ -15,7 +16,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
 
     response_type = re.search(re_type, line)
     if response_type == None:
-      self.response(400)
+      self.response(400, "Bad Request.")
       return None
     
     if response_type.group(0) == 'A':
@@ -32,7 +33,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
         
     name_or_ip = re.search(re_name, line) 
     if name_or_ip == None:
-      self.response(400)
+      self.response(400, "Bad Request.")
       return None
 
     try:
@@ -41,7 +42,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
       elif response_type.group(0) == 'PTR':
         resolved_name_or_ip = socket.gethostbyaddr(name_or_ip.group(0))[0]
     except:
-      self.response(404)
+      self.response(404, "Not Found.")
       return None
 
     return name_or_ip.group(0), response_type.group(0), resolved_name_or_ip
@@ -49,7 +50,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
   def do_GET(self):
 
     if re.search(r"^/resolve", self.path) == None:
-      self.response(400)
+      self.response(400, "Bad Request.")
       return
 
     result = self.validate(self.path, 'GET')
@@ -64,7 +65,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
   def do_POST(self):
 
     if self.path != "/dns-query":
-      self.response(400)
+      self.response(400, "Bad Request.")
       return
 
     content_length = int(self.headers['Content-Length'])
@@ -82,25 +83,25 @@ class Handler (http.server.BaseHTTPRequestHandler):
     self.wfile.write(output.rstrip().encode('utf-8'))
 
   def do_HEAD(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
   def do_PUT(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
   def do_DELETE(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
   
   def do_CONNECT(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
   def do_OPTIONS(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
   def do_TRACE(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
   def do_PATCH(self):
-    self.response(405)
+    self.response(405, "Method Not Allowed.")
 
 if __name__ == "__main__":
 
@@ -109,10 +110,11 @@ if __name__ == "__main__":
   else:
     PORT = 5353
 
-  with socketserver.TCPServer(("", PORT), Handler) as httpd:
+  with socketserver.TCPServer(("", PORT), Handler) as server:
       try:
-        httpd.serve_forever()
+        server.serve_forever()
       except Exception:
         pass
       finally:
-        httpd.server_close()
+        server.shutdown()
+        server.server_close()
