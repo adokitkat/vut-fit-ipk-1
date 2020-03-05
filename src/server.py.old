@@ -2,8 +2,6 @@ import http.server, socket, socketserver, sys, re, cgi
 
 class Handler (http.server.BaseHTTPRequestHandler):
 
-  verbose_response = {200: "OK.", 400: "Bad Request.", 404: "Not Found.", 405: "Method Not Allowed.", 500: "Internal Server Error."}
-
   def response(self, n, msg=None):
     self.protocol_version = 'HTTP/1.1'
     self.send_response(n, msg)
@@ -18,7 +16,8 @@ class Handler (http.server.BaseHTTPRequestHandler):
 
     response_type = re.search(re_type, line)
     if response_type == None:
-      return (400, None, None, None)
+      self.response(400, "Bad Request.")
+      return None
     
     if response_type.group(0) == 'A':
       if method == 'GET':
@@ -34,7 +33,8 @@ class Handler (http.server.BaseHTTPRequestHandler):
         
     name_or_ip = re.search(re_name, line) 
     if name_or_ip == None:
-      return (400, None, None, None)
+      self.response(400, "Bad Request.")
+      return None
 
     try:
       if response_type.group(0) == 'A':
@@ -42,64 +42,66 @@ class Handler (http.server.BaseHTTPRequestHandler):
       elif response_type.group(0) == 'PTR':
         resolved_name_or_ip = socket.gethostbyaddr(name_or_ip.group(0))[0]
     except:
-      return (404, None, None, None)
+      self.response(404, "Not Found.")
+      return None
 
-    if repr(name_or_ip.group(0)) == repr(resolved_name_or_ip):
-      return (400, None, None, None)
-    else:
-      return (200, name_or_ip.group(0), response_type.group(0), resolved_name_or_ip)
+    return name_or_ip.group(0), response_type.group(0), resolved_name_or_ip
 
   def do_GET(self):
+
     if re.search(r"^/resolve", self.path) == None:
-      self.response(400, self.verbose_response[400])
+      self.response(400, "Bad Request.")
       return
 
-    code, name_or_ip, response_type, resolved_name_or_ip = self.validate(self.path, 'GET')
-    self.response(code, self.verbose_response[code])
-    if code == 200:
-      self.wfile.write((name_or_ip + ':' + response_type + '=' + resolved_name_or_ip).encode('utf-8'))
+    result = self.validate(self.path, 'GET')
+    if result == None:
+      return
+    else:
+      name_or_ip, response_type, resolved_name_or_ip = result
+
+    self.response(200)
+    self.wfile.write((name_or_ip + ':' + response_type + '=' + resolved_name_or_ip).encode('utf-8'))
 
   def do_POST(self):
+
     if self.path != "/dns-query":
-      self.response(400, self.verbose_response[400])
+      self.response(400, "Bad Request.")
       return
 
     content_length = int(self.headers['Content-Length'])
     post_data = self.rfile.read(content_length)
     output = ''
-    codes = []
     for line in iter(post_data.decode('utf-8').splitlines()):
-      code, name_or_ip, response_type, resolved_name_or_ip = self.validate(line, 'POST')
-      codes.append(code)
-      if code == 200:
-        output += (name_or_ip + ':' + response_type + '=' + resolved_name_or_ip + '\r\n')
+      result = self.validate(line, 'POST')
+      if result == None:
+        return
+      else:
+        name_or_ip, response_type, resolved_name_or_ip = result
+        output += (name_or_ip + ':' + response_type + '=' + resolved_name_or_ip + '\n')
 
-    if 200 in codes:
-      self.response(200, self.verbose_response[200])
-      self.wfile.write(output.rstrip().encode('utf-8'))
-    else:
-      self.response(code, self.verbose_response[code])
+    self.response(200)
+    self.wfile.write(output.rstrip().encode('utf-8'))
 
   def do_HEAD(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
   def do_PUT(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
   def do_DELETE(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
   
   def do_CONNECT(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
   def do_OPTIONS(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
   def do_TRACE(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
   def do_PATCH(self):
-    self.response(405, self.verbose_response[405])
+    self.response(405, "Method Not Allowed.")
 
 if __name__ == "__main__":
 
