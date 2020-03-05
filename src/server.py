@@ -113,8 +113,6 @@ if __name__ == "__main__":
   with socketserver.TCPServer(("", PORT), Handler) as server:
       try:
         server.serve_forever()
-      except Exception:
-        pass
       finally:
         server.shutdown()
         server.server_close()
