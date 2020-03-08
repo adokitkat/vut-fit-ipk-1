@@ -4,9 +4,13 @@
 
 ### Spustenie
 
-Pre spustenie servera na základnom 5353 porte, v termináli v tomto priečinku napíšte: ```make run```
+Pre spustenie servera na základnom 5353 porte, v termináli v tomto priečinku napíšte: 
 
-Pre spustenie servera na používateľom špecifikovanom porte, v termináli v tomto priečinku napíšte ```make run PORT=x```, kde "x" je číslo portu
+```make run```
+
+Pre spustenie servera na používateľom špecifikovanom porte, v termináli v tomto priečinku napíšte 
+
+```make run PORT=x```, kde "x" je číslo portu
 
 ### Technológia
 
@@ -41,3 +45,9 @@ www.seznam.cz:A
 147.229.14.131:PTR
 ihned.cz:A
 ```
+
+### Implementácia
+
+Na vytvorenie servera používam **TCPServer()**, jeho handler implementujem ako triedu **Handler()**, v ktorej dedím z triedy **http.server.BaseHTTPRequestHandler()**.
+
+Požiadavky prechádzajú cez pozmenenú **parse_request()** metódu, kde sa kontroluje správnosť požiadavky. Náslenedne sa spúšťajú buď metóda **GET()** alebo **POST()**, kde sa validuje URL. Ďalej sa volá metóda **validate()**, kde sa kontrolujú všetky ostatné veci (najmä regexom). Po správnom ukončenú tejto metódy sa vracia vyriešená poiadavka, alebo chybový kód, čo metódy **GET()** alebo **POST()** odošlú prostredníctvom **response()** metódy.
